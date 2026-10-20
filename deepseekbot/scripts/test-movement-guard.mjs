@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import { installMovementGuards } from '../src/utils/movement_guard.js';
+
+const packets = [];
+const calls = [];
+const bot = new EventEmitter();
+bot.entity = { position: { x: 1, y: 64, z: 2 }, velocity: { x: 0, y: 0, z: 0 },
+    yaw: 0, pitch: 0, eyeHeight: undefined };
+bot.clearControlStates = () => {};
+bot._client = { write: (name, data) => packets.push({ name, data }) };
+bot.look = async (...args) => calls.push(args);
+bot.lookAt = async (...args) => calls.push(args);
+installMovementGuards(bot);
+bot.emit('login');
+bot.emit('spawn');
+bot.entity.position.x = NaN;
+bot.entity.velocity.y = Infinity;
+bot.emit('physicsTick');
+assert.equal(bot.entity.position.x, 1);
+assert.equal(bot.entity.velocity.y, 0);
+await bot.look(NaN, 0);
+await bot.lookAt({ x: 1, y: NaN, z: 2 });
+assert.equal(calls.length, 0);
+await bot.lookAt({ x: 1, y: 65, z: 2 });
+assert.equal(bot.entity.eyeHeight, 1.62);
+assert.equal(calls.length, 1);
+bot._client.write('look', { yaw: NaN, pitch: 0 });
+assert.equal(packets.length, 0);
+bot._client.write('position_look', { x: 1, y: 64, z: 2, yaw: 0, pitch: 0 });
+bot._client.write('teleport_confirm', { teleportId: 4 });
+assert.equal(packets.length, 2);
+console.log('Invalid gaze targets and movement packets are blocked; valid movement and teleport acknowledgements pass.');

@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "native_skill_api": {
+    "implementation": "javascript",
+    "source": "one async function run(api, args), returning {success:boolean,message:string,data?:object}",
+    "target": "!skill_<name>; this is a NEW command, not one of the existing primitives",
+    "methods": {
+      "state()": "async -> {position:{x,y,z},inventory:{item:count},health,food,oxygen:0..20|null,in_water,submerged,empty_slots}",
+      "now()": "async -> timestamp in ms; use this for deadlines so simulation time works",
+      "wait(ms)": "async, 0..2000 per call; check conditions in bounded loops",
+      "skill(name,argsArray)": "async invoke ANY exported native library skill; examples collectBlock:[blockName,count], discard:[itemName,count], goToPosition:[x,y,z,minDistance], equip:[itemName], smeltItem:[rawItemName,count], placeBlock:[name,x,y,z]",
+      "findBlocks(name,range=16,count=8)": "async -> [{name,type,position:{x,y,z}}], loaded chunks only, count <=32",
+      "blockAt(x,y,z)": "async -> {name,type,position,metadata,boundingBox}|null",
+      "control(name,bool)": "async, Minecraft movement keys",
+      "lookAt(x,y,z)": "async",
+      "command(text)": "async execute a Minecraft slash command with existing server permissions",
+      "openFurnace(position)": "async -> handle number; close it before opening another",
+      "furnace(handle,op,...args)": "async; op=state|putInput(item,count)|putFuel(item,count)|takeOutput|close. Load different furnaces sequentially; their burning proceeds in parallel in the world",
+      "log(text)": "async log gameplay progress"
+    },
+    "postconditions": {
+      "inventory_gain": "{type:'inventory_gain',item:string|{arg:index},amount:number|{arg:index}}",
+      "position_near": "{type:'position_near',position:[x|{arg:index},y,z],radius:1..8}",
+      "surface": "{type:'surface'}; must actually go from submerged to air",
+      "state_report": "{type:'state_report',fields:['health','oxygen','inventory',...]} -> return data matching actual host state, additional computed fields allowed",
+      "blocks_present": "{type:'blocks_present',block:string|{arg:index},positions:JSON-string|{arg:index}}; positions encodes [[x,y,z],...] and at least one block must change"
+    },
+    "tests": "2..6 cases {name,args:[],state:{inventory,position,health,food,oxygen,empty_slots,submerged,blocks:[{name,position}]},expect_success:boolean,expected_data?:{computedField:value}}. Success is independently checked against the postcondition. Test fixtures support state/blocks/control, equip, collectBlock, discard, goToPosition, placeBlock, smeltItem and furnace operations"
+  },
+  "commands": {
+    "!collectBlocks": ["string", "number"],
+    "!discard": ["string", "number"],
+    "!consume": ["string"],
+    "!equip": ["string"],
+    "!craftRecipe": ["string", "number"],
+    "!smeltItem": ["string", "number"],
+    "!placeHere": ["string"],
+    "!goToCoordinates": ["number", "number", "number", "number"],
+    "!moveAway": ["number"],
+    "!searchForBlock": ["string", "number"],
+    "!dive": ["number", "number"],
+    "!digDown": ["number"],
+    "!goToSurface": [],
+    "!surface": []
+  },
+  "settings": {
+    "search_slice_ms": {"min": 1, "max": 8, "target": "!searchForBlock", "default": 4},
+    "water_stall_ms": {"min": 8000, "max": 20000, "target": "!goToCoordinates", "default": 12000},
+    "water_progress_blocks": {"min": 0.15, "max": 0.6, "target": "!goToCoordinates", "default": 0.35},
+    "dive_stall_ms": {"min": 2000, "max": 8000, "target": "!dive", "default": 4000},
+    "dive_air_margin_seconds": {"min": 5, "max": 8, "target": "!dive", "default": 5}
+  }
+}
